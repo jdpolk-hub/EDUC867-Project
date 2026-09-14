@@ -7,17 +7,27 @@ editor: visual
 
 ## Introduction
 
+This section will introduce the research problem, purpose, and research question(s).
+
 ## Data
+
+This section will describe the data source, sample, variables, and any data preparation process.
 
 ## Methods
 
+This section will describe the statistical methods and analytic procedures used to address the research question(s).
+
 ## Results
+
+This section will present the results of the analysis, including relevant estimates, tables, and figures.
 
 ```{r}
 
 x <- 0:10
 mean(x)
 ```
+
+The results from the analysis will be interpreted and summarized here.
 
 ## Reproducibility
 
