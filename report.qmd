@@ -1,0 +1,27 @@
+---
+title: "report"
+author: "Joy Polk"
+format: html
+editor: visual
+---
+
+## Introduction
+
+## Data
+
+## Methods
+
+## Results
+
+```{r}
+
+x <- 0:10
+mean(x)
+```
+
+## Reproducibility
+
+```{r}
+
+sessionInfo()
+```
