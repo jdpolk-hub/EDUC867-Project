@@ -31,7 +31,7 @@ The results from the analysis will be interpreted and summarized here.
 
 ## Reproducibility
 
-To asses the portability of the project, I cloned the GitHub repository and rendered `report.qmd` on a second computer running Windows 11 x64 with R version 4.5.3. The report rendered successfully from the fresh clone without requiring any changes to the repository or project files. The `sessionInfor()` output below reports the R environment for the machine on which the report is currently rendered.
+To asses the portability of the project, I cloned the GitHub repository and rendered `report.qmd` on a second computer running Windows 11 x64 with R version 4.5.3. The report rendered successfully from the fresh clone without requiring any changes to the repository or project files. The `sessionInfo()` output below reports the R environment for the machine on which the report is currently rendered.
 
 ```{r}
 
