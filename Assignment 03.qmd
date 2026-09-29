@@ -1,0 +1,329 @@
+---
+title: "Assignment 03 Power Simulation"
+author: "Joy Polk"
+format: 
+  html: default
+  pdf: default
+editor: visual
+---
+
+## Purpose
+
+The purpose of this exercise is to demonstrate one's ability to use Monte Carlo simulation to evaluate statistical power and false-positive rates across different sample sizes and predictor correlation structures in a Click-to-Run file that can be rendered as HTML and PDF across various operating systems (e.g., Mac, Windows, Linux).
+
+### Core: Task 1
+
+*Write a function that simulates data from a 3-predictor regression and fits the model, with modifiable parameters (at minimum: sample size, the three coefficients, error variance, number of replications). Choose your own effect sizes that fulfill the general rule of Beta1 \> 0, Beta2 \< 0, Beta3 = 0, set a seed, and be prepared to defend your choices in the write-up.*
+
+```{r}
+
+sim_reg <- function(n, R, beta0, beta1, beta2, beta3, var_x, var_eps){
+  
+  results <- as.data.frame(matrix(NA, nrow = R, ncol = 6))
+  
+  names(results) <- c("Beta1", "P_Beta1", "Beta2", "P_Beta2", "Beta3", "P_Beta3")
+
+  for (r in 1:R){
+    #Generate three independent predictors
+    x1 <- rnorm(n, mean = 0, sd = sqrt(var_x))
+    x2 <- rnorm(n, mean = 0, sd = sqrt(var_x))
+    x3 <- rnorm(n, mean = 0, sd = sqrt(var_x))
+    #Generate error
+    epsilon <- rnorm(n, mean = 0, sd = sqrt(var_eps))
+    #Generate outcome
+    y <- beta0 + beta1 * x1 + beta2 * x2 + beta3 * x3 + epsilon
+    
+    sim_data <- data.frame(x1, x2, x3, y)
+    #Fit regression
+    model <-lm(y ~ x1 + x2 + x3, data = sim_data)
+    #Store coefficients
+    results[r, "Beta1"] <- coef(model)["x1"]
+    results[r, "Beta2"] <- coef(model)["x2"]
+    results[r, "Beta3"] <- coef(model)["x3"]
+    #Store p-values
+    results[r, "P_Beta1"] <- summary(model)$coefficients["x1","Pr(>|t|)"]
+    results[r, "P_Beta2"] <- summary(model)$coefficients["x2","Pr(>|t|)"]
+    results[r, "P_Beta3"] <- summary(model)$coefficients["x3","Pr(>|t|)"]
+    
+  }
+  
+  return(results)
+    
+}
+```
+
+I created a function to simulate data from a three-predictor regression with modifiable parameters for sample size, the three regression coefficients, predictor variance, error variance, and number of replications. The simulation conditions specified in Task 2 include a positive effect, a smaller negative effect, and a null effect, allowing the simulation to compare power for effects of different magnitudes while also evaluating the false-positive rate for a predictor with no true effect.
+
+### Core: Task 2
+
+*Evaluate the power of Beta1 and Beta2, and the false positive rate of Beta3, at p \< 0.05 across 3 different sample sizes. Pick sample sizes that you expect to show a relevant distinction for the coefficients you chose, and justify those choices in writing. Use enough replications that your estimates are stable, and justify that number too. Recall from IC-04 that a power estimate is itself a Monte Carlo estimate with its own simulation noise; your write-up should show you know roughly how much noise your replication count leaves you with.*
+
+```{r}
+
+set.seed(20260928)
+
+#Run 5,000 replications at each sample size
+sample_sizes <- c(50, 100, 200)
+R <- 5000
+beta0 <- 1
+beta1 <- 0.30
+beta2 <- -0.15
+beta3 <- 0
+var_x <- 1
+var_eps <- 1
+
+results_n50 <- sim_reg(
+  n = sample_sizes[1], R = R,
+  beta0 = beta0, beta1 = beta1, beta2 = beta2, beta3 = beta3,
+  var_x = var_x, var_eps = var_eps
+)
+
+results_n100 <- sim_reg(
+  n = sample_sizes[2], R = R,
+  beta0 = beta0, beta1 = beta1, beta2 = beta2, beta3 = beta3,
+  var_x = var_x, var_eps = var_eps
+)
+
+results_n200 <- sim_reg(
+  n = sample_sizes[3], R = R,
+  beta0 = beta0, beta1 = beta1, beta2 = beta2, beta3 = beta3,
+  var_x = var_x, var_eps = var_eps
+)
+#Calculate power and the false positive results of specified predictors
+power_results <- data.frame(
+  
+  Sample_Size = c(50, 100, 200),
+  
+  Beta1_Power = c(
+    mean(results_n50$P_Beta1 < 0.05),
+    mean(results_n100$P_Beta1 < 0.05),
+    mean(results_n200$P_Beta1 < 0.05)
+  ), 
+  
+  Beta2_Power = c(
+    mean(results_n50$P_Beta2 < 0.05),
+    mean(results_n100$P_Beta2 < 0.05),
+    mean(results_n200$P_Beta2 < 0.05)
+  ), 
+  
+  Beta3_FPR = c(
+    mean(results_n50$P_Beta3 < 0.05),
+    mean(results_n100$P_Beta3 < 0.05),
+    mean(results_n200$P_Beta3 < 0.05)
+  )
+  
+)
+
+#Calulate Monte Carlo standard errors
+power_results$MCSE_Beta1 <- sqrt(power_results$Beta1_Power * (1 - power_results$Beta1_Power)/R)
+power_results$MCSE_Beta2 <- sqrt(power_results$Beta2_Power * (1 - power_results$Beta2_Power)/R)
+power_results$MCSE_Beta3 <- sqrt(power_results$Beta3_FPR * (1 - power_results$Beta3_FPR)/R)
+
+power_results
+
+```
+
+I evaluated sample sizes of `r sample_sizes[1]`, `r sample_sizes[2]`, and `r sample_sizes[3]` to examine power across increasingly larger samples and to capture differences in detectability between the two nonzero coefficients. I used `r format(R, big.mark = ",")` replications per condition to obtain stable estimates of power and the false-positive rate. The Monte Carlo standard errors were small across all conditions, ranging from approximately `r round(min(power_results[, c("MCSE_Beta1", "MCSE_Beta2", "MCSE_Beta3")]), 3)` to `r round(max(power_results[, c("MCSE_Beta1", "MCSE_Beta2", "MCSE_Beta3")]), 3)`, indicating that relatively little simulation noise remained in the estimated proportions. Across the three sample sizes, the false-positive rate for Beta3 remained close to the specified α = 0.05 level.
+
+### Core: Task 3
+
+*Visualize power and the false positive rate for each effect across sample size, in a figure (or small set of figures) a reader can interpret without consulting your code. Interpret the results in a few sentences: which effects are detectable where, and is the false positive rate behaving?*
+
+```{r}
+
+#| fig-height: 6.5
+#| fig-width: 8
+
+#Create separate areas for the graph and legend
+layout(
+  matrix(c(1, 2), nrow = 2),
+  heights = c(5, 1)
+)
+
+#Set margins for graph
+par(mar = c(5, 4, 4, 2))
+
+#Plot power and false positive rate across sample sizes
+plot(
+  power_results$Sample_Size,
+  power_results$Beta1_Power,
+  type = "b",
+  pch = 16,
+  lwd = 2,
+  ylim = c(0, 1),
+  xlab = "Sample Size",
+  ylab = "Proportion Significant",
+  main = "Power and False-Positive Rate Across Sample Size"
+)
+
+lines(
+  power_results$Sample_Size,
+  power_results$Beta2_Power,
+  type = "b",
+  pch = 17,
+  lwd = 2,
+  lty = 2
+)
+
+lines(
+  power_results$Sample_Size,
+  power_results$Beta3_FPR,
+  type = "b",
+  pch = 15,
+  lwd = 2,
+  lty = 3
+)
+
+#Reference line for alpha = 0.05
+abline(
+  h = 0.05,
+  lty = 4
+)
+
+#Create separate area for legend
+par(mar = c(0, 0, 0, 0))
+
+plot.new()
+
+legend(
+  "center",
+  legend = c(
+    paste0("Beta1 = ", beta1),
+    paste0("Beta2 = ", beta2),
+    paste0("Beta3 = ", beta3),
+    "Alpha = 0.05"
+  ),
+  pch = c(16, 17, 15, NA),
+  lty = c(1, 2, 3, 4),
+  lwd = c(2, 2, 2, 1),
+  horiz = TRUE,
+  bty = "n",
+  cex = 0.8
+)
+
+```
+
+Power increased with sample size for both nonzero effects, but the larger positive effect was consistently easier to detect. For Beta1 = `r round(beta1, 2)`, power increased from `r round(power_results$Beta1_Power[1] * 100, 1)`% at n = `r sample_sizes[1]` to `r round(power_results$Beta1_Power[2] * 100, 1)`% at n = `r sample_sizes[2]` and `r round(power_results$Beta1_Power[3] * 100, 1)`% at n = `r sample_sizes[3]`. In contrast, power for the smaller Beta2 = `r round(beta2, 2)` effect increased from `r round(power_results$Beta2_Power[1] * 100, 1)`% to `r round(power_results$Beta2_Power[2] * 100, 1)`% and `r round(power_results$Beta2_Power[3] * 100, 1)`%, showing that even at n = `r sample_sizes[3]` this effect was detected only slightly more than half of the time. The false-positive rate for the null Beta3 remained close to the expected 5% across all three sample sizes (`r round(power_results$Beta3_FPR[1] * 100, 2)`%, `r round(power_results$Beta3_FPR[2] * 100, 2)`%, and `r round(power_results$Beta3_FPR[3] * 100, 2)`%), indicating that increasing sample size improved the ability to detect real effects without increasing the rate of incorrectly detecting the null effect.
+
+### Stretch: Task 1
+
+*Power and false-positive results under at least two different nonzero correlation structures among the predictors, compared against your independent-predictor results from the Core.*
+
+```{r}
+
+#Function to simulate regression with correlated predictors
+sim_reg_cor <- function(n, R, beta0, beta1, beta2, beta3, var_eps, rho) {
+  
+  results <- as.data.frame(matrix(NA, nrow = R, ncol = 3))
+  names(results) <- c("P_Beta1", "P_Beta2", "P_Beta3")
+  
+  for (r in 1:R) {
+    #Generate correlated predictors
+    z <- rnorm(n)
+    
+    x1 <- sqrt(rho) * z + sqrt(1 - rho) * rnorm(n)
+    x2 <- sqrt(rho) * z + sqrt(1 - rho) * rnorm(n)
+    x3 <- sqrt(rho) * z + sqrt(1 - rho) * rnorm(n)
+    
+    #Generate outcome
+    epsilon <- rnorm(n, mean = 0, sd = sqrt(var_eps))
+    
+    y <- beta0 + beta1*x1 + beta2*x2 + beta3*x3 + epsilon
+    
+    #Fit regression
+    model <- lm(y ~ x1 + x2 + x3)
+    
+    #Store p-values
+    results[r, "P_Beta1"] <- summary(model)$coefficients["x1", "Pr(>|t|)"]
+    results[r, "P_Beta2"] <- summary(model)$coefficients["x2", "Pr(>|t|)"]
+    results[r, "P_Beta3"] <- summary(model)$coefficients["x3", "Pr(>|t|)"]
+  }
+  
+  return(results)
+}
+
+#Correlation conditions
+correlations <- c(0.30, 0.60)
+
+#Store results
+correlated_results <- data.frame()
+
+#Run simulations
+for (rho in correlations) {
+  
+  for (n in sample_sizes) {
+    
+    temp <- sim_reg_cor(
+      n = n,
+      R = R,
+      beta0 = beta0,
+      beta1 = beta1,
+      beta2 = beta2,
+      beta3 = beta3,
+      var_eps = var_eps,
+      rho = rho
+    )
+    
+    correlated_results <- rbind(
+      correlated_results,
+      data.frame(
+        Sample_Size = n,
+        Correlation = rho,
+        Beta1_Power = mean(temp$P_Beta1 < 0.05),
+        Beta2_Power = mean(temp$P_Beta2 < 0.05),
+        Beta3_FPR = mean(temp$P_Beta3 < 0.05)
+      )
+    )
+  }
+}
+
+```
+
+I extended the Core simulation by introducing correlations of `r correlations[1]` and `r correlations[2]` among the three predictors, representing moderate and stronger departures from the independent-predictor condition. Using two levels of correlation allows me to examine whether increasing correlation progressively affects power and the false-positive rate while keeping the remaining simulation conditions the same as in the Core analysis.
+
+### Stretch: Task 2
+
+*A presentation — figure or table — from which a reader can see at a glance which effects suffer under correlation, by how much, and which don’t.*
+
+```{r}
+
+#Create independent predictor results from Core
+independent_results <- data.frame(
+  Sample_Size = power_results$Sample_Size,
+  Correlation = 0,
+  Beta1_Power = power_results$Beta1_Power,
+  Beta2_Power = power_results$Beta2_Power,
+  Beta3_FPR = power_results$Beta3_FPR
+)
+
+#Combine independent and correlated conditions
+stretch_results <- rbind(
+  independent_results,
+  correlated_results
+)
+
+#Order results by sample size and correlation
+stretch_results <- stretch_results[
+  order(stretch_results$Sample_Size, stretch_results$Correlation),
+]
+
+#Round results for presentation
+stretch_results[, 3:5] <- round(
+  stretch_results[, 3:5],
+  3
+)
+
+row.names(stretch_results) <- NULL
+
+#Display comparison table
+stretch_results
+
+```
+
+The table below compares power for Beta1 and Beta2 and the false-positive rate for Beta3 across the independent, moderate-correlation, and stronger-correlation conditions at each sample size.
+
+### Stretch: Task 3
+
+*A 3–5 sentence account of why correlated predictors change power without (much) changing the false positive rate, or whatever pattern you actually find, based on your own results.*
+
+Predictor correlation reduced power for both nonzero effects, with larger reductions as the correlation increased. For example, at n = `r sample_sizes[2]`, power for Beta1 decreased from `r round(stretch_results$Beta1_Power[stretch_results$Sample_Size == sample_sizes[2] & stretch_results$Correlation == 0] * 100, 1)`% with independent predictors to `r round(stretch_results$Beta1_Power[stretch_results$Sample_Size == sample_sizes[2] & stretch_results$Correlation == correlations[2]] * 100, 1)`% when the correlation was `r correlations[2]`, while power for Beta2 decreased from `r round(stretch_results$Beta2_Power[stretch_results$Sample_Size == sample_sizes[2] & stretch_results$Correlation == 0] * 100, 1)`% to `r round(stretch_results$Beta2_Power[stretch_results$Sample_Size == sample_sizes[2] & stretch_results$Correlation == correlations[2]] * 100, 1)`%. Correlated predictors make it more difficult to distinguish each predictor's unique relationship with the outcome, which reduces the precision of the individual coefficient estimates and therefore lowers power. In contrast, the false-positive rate for Beta3 remained near the expected 5% across the correlation conditions, suggesting that predictor correlation reduced the ability to detect true effects without systematically increasing false-positive findings.
