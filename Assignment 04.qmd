@@ -1,0 +1,302 @@
+---
+title: "Assignment 04 Estimation Functions"
+author: "Joy Polk"
+format: 
+  html: default
+  pdf: default
+editor: visual
+---
+
+## Purpose
+
+The purpose of this assignment is to develop reuseable functions for estimating multiple linear regression models using matrix operations in a Click-to-Run file that can be rendered as HTML and PDF across various operating systems (e.g., Mac, Windows, Linux).
+
+### Core: Task 1
+
+*In your project repository, write (at minimum) two functions built on the matrix-based approach: a fitting function that takes an outcome and predictors (a matrix or a data structure you document — your design choice) and returns the coefficients, their standard errors, the residual variance, and the fitted values; and a prediction function that takes a fitted result and new predictor values and returns predicted outcomes.*
+
+Two reusable functions were developed and saved in `R/regression_functions.R`. The first, `fit_matrix_reg()`, estimates multiple linear regression models using matrix calculations. The second, `predict_matrix_reg()`, generates predicted outcomes from the estimated coefficients and new predictor values.
+
+### Core: Task 2
+
+*Document both functions with comments stating their inputs, outputs, and assumptions. Someone opening the file cold (for instance, you in November) should know what goes in, what comes out, and what the function assumes about its inputs.*
+
+Both functions include comments describing their inputs, outputs, and assumptions. The fitting function accepts a numeric outcome vector and a predictor matrix without an intercept column, which is added internally. The prediction function accepts the fitted model and new predictor values in the same order used during estimation. Both functions require complete numeric data, and the fitting function additionally requires a full-rank design matrix with more observations than estimated coefficients.
+
+```{r}
+
+#load functions
+source("R/regression_functions.R")
+
+#Load dataset
+motivation_data <- read.csv("data/motivation.csv")
+
+#Inspect dataset
+head(motivation_data)
+
+```
+
+### Core: Task 3
+
+*Demonstrate the fitting function on motivation.csv with all three predictors (parent, sibling, peer) predicting motivation, and show explicitly in the rendered document that your results match lm() in R or statsmodels in Python to numerical tolerance; a printed comparison or an allclose()-style check, visible in the output.*
+
+```{r}
+
+#Prepare outcome and predictors
+y <- motivation_data$motivation
+
+X <- as.matrix(
+  motivation_data[, c("parent", "sibling", "peer")]
+)
+
+#Fit matrix-based regression
+matrix_model <- fit_matrix_reg(y, X)
+
+#Fit regression using lm()
+lm_model <- lm(
+  motivation ~ parent + sibling + peer,
+  data = motivation_data
+)
+
+#Compare regression coefficients
+coefficient_comparison <- data.frame(
+  Matrix = as.vector(matrix_model$coefficients),
+  LM = as.vector(coef(lm_model))
+)
+
+rownames(coefficient_comparison) <- names(coef(lm_model))
+
+coefficient_comparison
+
+#Compare standard errors
+se_comparison <- data.frame(
+  Matrix = as.vector(matrix_model$standard_errors),
+  LM = as.vector(summary(lm_model)$coefficients[, "Std. Error"])
+)
+
+rownames(se_comparison) <- names(coef(lm_model))
+
+se_comparison
+
+#Compare residual variance
+c(
+  Matrix = matrix_model$residual_variance,
+  LM = summary(lm_model)$sigma^2
+)
+
+#Compare fitted values
+all.equal(
+  as.vector(matrix_model$fitted_values),
+  as.vector(fitted(lm_model))
+)
+
+#Demonstrate prediction function
+predictions <- predict_matrix_reg(matrix_model, X)
+
+#Compare predictions with lm()
+all.equal(
+  predictions,
+  as.vector(predict(lm_model))
+)
+
+```
+
+The matrix-based regression function reproduced the results obtained from `lm()` to numerical tolerance. The estimated regression coefficients were `r round(matrix_model$coefficients[1], 3)` for the intercept, `r round(matrix_model$coefficients[2], 3)` for parent support, `r round(matrix_model$coefficients[3], 3)` for sibling support, and `r round(matrix_model$coefficients[4], 3)` for peer support. The corresponding standard errors were `r round(matrix_model$standard_errors[1], 3)`, `r round(matrix_model$standard_errors[2], 3)`, `r round(matrix_model$standard_errors[3], 3)`, and `r round(matrix_model$standard_errors[4], 3)`, respectively. The residual variance was `r round(matrix_model$residual_variance, 3)`. Both the fitted values and predictions agreed with the packaged regression results, confirming that the matrix-based fitting and prediction functions reproduce the results of `lm()`.
+
+### Core: Task 4
+
+*Write at least three unit tests that run, and visibly pass, in the rendered document: (a) your functions recover the packaged software’s results; (b) your outputs have the correct dimensions; (c) your functions recover known parameters from data you simulate yourself. Reference Week 7’s testing patterns here.*
+
+```{r}
+
+#Test A: Agreement with lm()
+stopifnot(
+  isTRUE(all.equal(
+    as.vector(matrix_model$coefficients),
+    as.vector(coef(lm_model))
+  )),
+  isTRUE(all.equal(
+    predictions,
+    as.vector(predict(lm_model))
+  ))
+)
+
+cat("Test A passed: Matrix estimates and predictions agree with lm().\n")
+
+
+#Test B: Correct output dimensions
+stopifnot(
+  length(matrix_model$coefficients) == ncol(X) + 1,
+  length(matrix_model$standard_errors) == ncol(X) + 1,
+  length(matrix_model$fitted_values) == nrow(X),
+  length(predictions) == nrow(X)
+)
+
+cat("Test B passed: Output dimensions are correct.\n")
+
+
+#Test C: Recovery of known parameters
+set.seed(1234)
+
+n <- 1000
+
+#Simulate predictors
+x1 <- rnorm(n)
+x2 <- rnorm(n)
+
+#Simulate outcome with known coefficients
+y_sim <- 1 + 0.5*x1 - 0.3*x2 + rnorm(n, sd = 1)
+
+#Fit matrix regression
+sim_model <- fit_matrix_reg(
+  y_sim,
+  cbind(x1, x2)
+)
+
+#True population coefficients
+true_beta <- c(1, 0.5, -0.3)
+
+#Compare estimated and true coefficients
+data.frame(
+  True = true_beta,
+  Estimated = as.vector(sim_model$coefficients)
+)
+
+#Check parameter recovery within tolerance
+stopifnot(
+  all(abs(as.vector(sim_model$coefficients) - true_beta) < 0.15)
+)
+
+cat("Test C passed: Known parameters recovered within tolerance.\n")
+
+```
+
+All three unit tests passed. The matrix-based functions reproduced the coefficients and predictions obtained from `lm()`, returned outputs with the expected dimensions, and recovered the known population parameters from simulated data within the specified tolerance. Specifically, the estimated intercept was `r round(sim_model$coefficients[1], 3)` compared with a true value of `r true_beta[1]`, the estimated coefficient for x1 was `r round(sim_model$coefficients[2], 3)` compared with `r true_beta[2]`, and the estimated coefficient for x2 was `r round(sim_model$coefficients[3], 3)` compared with `r true_beta[3]`. These results provide additional evidence that the functions perform as intended.
+
+### Stretch: Task 1
+
+*Full inference, by hand. The fitting function should also return the inferential quantities: t statistics, p-values, the model F test, and R2 — all computed from the matrix results, not pulled from packaged software — and the rendered document must verify each of them against the packaged output.*
+
+```{r}
+
+#Extract packaged regression results
+lm_summary <- summary(lm_model)
+
+#Compare t statistics
+t_comparison <- data.frame(
+  Matrix = as.vector(matrix_model$t_statistics),
+  LM = as.vector(lm_summary$coefficients[, "t value"])
+)
+
+rownames(t_comparison) <- names(coef(lm_model))
+
+t_comparison
+
+
+#Compare p-values
+p_comparison <- data.frame(
+  Matrix = as.vector(matrix_model$p_values),
+  LM = as.vector(lm_summary$coefficients[, "Pr(>|t|)"])
+)
+
+rownames(p_comparison) <- names(coef(lm_model))
+
+p_comparison
+
+
+#Compare model F statistic
+f_comparison <- data.frame(
+  Matrix = matrix_model$F_statistic,
+  LM = unname(lm_summary$fstatistic["value"])
+)
+
+f_comparison
+
+
+#Compare R-squared
+r2_comparison <- data.frame(
+  Matrix = matrix_model$R_squared,
+  LM = lm_summary$r.squared
+)
+
+r2_comparison
+
+
+#Verify numerical agreement
+stopifnot(
+  isTRUE(all.equal(
+    as.vector(matrix_model$t_statistics),
+    as.vector(lm_summary$coefficients[, "t value"])
+  )),
+  isTRUE(all.equal(
+    as.vector(matrix_model$p_values),
+    as.vector(lm_summary$coefficients[, "Pr(>|t|)"])
+  )),
+  isTRUE(all.equal(
+    matrix_model$F_statistic,
+    unname(lm_summary$fstatistic["value"])
+  )),
+  isTRUE(all.equal(
+    matrix_model$R_squared,
+    lm_summary$r.squared
+  ))
+)
+
+cat("All inference comparisons passed.\n")
+
+```
+
+The matrix-based calculations reproduced the t statistics, p-values, model F statistic, and R² obtained from `lm()` to numerical tolerance. The overall model F statistic was `r round(matrix_model$F_statistic, 3)`, and the R² value was `r round(matrix_model$R_squared, 3)`, indicating that approximately `r round(100 * matrix_model$R_squared, 1)`% of the variation in motivation was explained by parent, sibling, and peer support. The comparisons of coefficient-level t statistics and p-values also demonstrated numerical agreement with the packaged regression results. Together, these findings confirm that the function reproduces the inferential statistics calculated by `lm()` using matrix operations.
+
+### Stretch: Task 2
+
+*Loud failure. Given data containing missing values, or a predictor matrix that is rank- deficient, your functions must fail loudly with an informative error message rather than silently returning garbage — and your document must include tests proving both behaviors: one showing the missing-data refusal, one showing the rank-deficiency refusal, each demonstrating that the error occurs and says something useful.*
+
+```{r}
+
+#Test 1: Missing values
+X_missing <- X
+X_missing[1, 1] <- NA
+
+missing_error <- tryCatch(
+  fit_matrix_reg(y, X_missing),
+  error = function(e) e
+)
+
+#Display error message
+print(conditionMessage(missing_error))
+
+#Verify an error occurred and the message is informative
+stopifnot(
+  inherits(missing_error, "error"),
+  grepl("Missing", conditionMessage(missing_error))
+)
+
+cat("Test 1 passed: The function correctly rejected missing data and returned an informative error message.\n")
+
+
+#Test 2: Rank-deficient predictor matrix
+X_rank <- cbind(
+  parent = motivation_data$parent,
+  duplicate_parent = motivation_data$parent
+)
+
+rank_error <- tryCatch(
+  fit_matrix_reg(y, X_rank),
+  error = function(e) e
+)
+
+#Display error message
+print(conditionMessage(rank_error))
+
+#Verify an error occurred and the message is informative
+stopifnot(
+  inherits(rank_error, "error"),
+  grepl("rank-deficient", conditionMessage(rank_error))
+)
+
+cat("Test 2 passed: The function correctly identified a rank-deficient predictor matrix and returned an informative error message.\n")
+
+```
+
+Both input-validation tests passed. When a missing value was introduced into the predictor matrix, the function rejected the input and returned an error indicating that missing or non-finite values were not allowed. Similarly, when two identical predictor columns were supplied, the function identified the rank-deficient matrix and returned an informative error. These tests demonstrate that the function appropriately rejects invalid inputs rather than producing potentially misleading regression estimates.
