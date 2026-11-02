@@ -1,0 +1,367 @@
+---
+title: "Assignment 06: Simulation Design"
+author: "Joy Polk"
+format: 
+  html: default
+  pdf: default
+editor: visual
+---
+
+## Purpose
+
+The purpose of this assignment is to develop and evaluate a simulation study design for examining statistical power and false-positive rates in standard linear regression across varying sample sizes and effect sizes in a Click-to-Run file that can be rendered as HTML and PDF across various operating systems (e.g., Mac, Windows, Linux).
+
+### Core: Task 1
+
+***The question, made precise.** Two or three sentences translating Step 1 into something a simulation can answer: for your track (standard regression or multilevel) and your planned analysis, exactly what will the study estimate, over what range, to inform what decision?*
+
+This simulation study will evaluate the statistical power and false-positive rate of ordinary least squares regression across varying sample sizes and true effect sizes. Specifically, the study will examine the probability of detecting small ($\beta = 0.1$) and medium ($\beta = 0.3$) effects, alongside the probability of incorrectly rejecting the null hypothesis when $\beta = 0$. The findings will inform the sample size needed to achieve at least 80% statistical power while maintaining an acceptable false-positive rate at a nominal significance level of $\alpha = 0.05$.
+
+### Core: Task 2
+
+***Data-generating model.** Your project’s model in equations, using course notation, with the parameter values you will simulate under stated and defended (a sentence per choice is enough — “defensible” means you can say why, not that the value is sacred).*
+
+The simulation study will use a multiple linear regression model with three predictors. For observation $i$, the data-generating model is:
+
+$$Y_i = \beta_0 + \beta_1 X_{1i} + \beta_2 X_{2i} + \beta_3 X_{3i} + \varepsilon_i$$
+
+where $Y_i$ is the continuous outcome, $\beta_0$ is the intercept, $\beta_1$, $\beta_2$, and $\beta_3$ are the regression coefficients, and $\varepsilon_i$ is the residual error.
+
+The predictors will be generated independently from standard normal distributions, and the residual errors will follow a normal distribution with mean zero and variance one:
+
+$$X_{1i}, X_{2i}, X_{3i} \overset{\mathrm{iid}}{\sim} N(0,1)$$
+
+$$\varepsilon_i \sim N(0,1)$$
+
+The intercept will be fixed at $\beta_0 = 2$, providing a consistent baseline outcome across simulation conditions. The coefficient of primary interest, $\beta_1$, will vary across three values: 0 (null effect), 0.1 (small effect), and 0.3 (medium effect). These values allow the study to evaluate the false-positive rate when the null hypothesis is true and statistical power when a positive effect is present.
+
+The remaining coefficients will be held constant at $\beta_2 = 0.4$ and $\beta_3 = -0.3$, representing additional predictors with positive and negative associations with the outcome. Holding these coefficients constant isolates the effects of sample size and the magnitude of $\beta_1$ on statistical power. The use of independent, normally distributed predictors and errors establishes a controlled setting in which the assumptions of ordinary least squares regression are satisfied.
+
+### Core: Task 3
+
+***Condition grid.** A couple factors should be designed around step 1 of the final project: sample size × effect size (small, medium, null), and the multilevel track adds number of clusters; but the levels are yours: which sample sizes, spanning what range, spaced how, and why. Justify the levels and state the total number of cells.*
+
+```{r}
+
+# Define simulation conditions
+sample_sizes <- c(50, 100, 200, 400, 600, 1000)
+effect_sizes <- c(0, 0.1, 0.3)
+
+# Generate condition grid
+condition_grid <- expand.grid(
+  n = sample_sizes,
+  beta1 = effect_sizes
+)
+
+# Display condition grid
+condition_grid
+
+# Total number of conditions
+nrow(condition_grid)
+
+```
+
+The simulation study will vary two factors: sample size ($n$) and the true regression coefficient of interest ($\beta_1$). `r length(sample_sizes)` sample sizes will be examined ($n =$ `r paste(format(sample_sizes, big.mark = ",", trim = TRUE), collapse = ", ")`), crossed with `r length(effect_sizes)` effect sizes ($\beta_1 =$ `r paste(effect_sizes, collapse = ", ")`), resulting in `r nrow(condition_grid)` simulation conditions.
+
+The selected sample sizes span small to relatively large datasets, with closer spacing among smaller samples to examine changes in statistical power where sample size may have a greater influence. The larger sample sizes provide an opportunity to evaluate whether the 80% power target can be achieved, particularly for the smaller effect. The three effect sizes correspond to the null, small, and medium effects required for the final project's power study. Under the null condition, the false-positive rate will be evaluated, while the nonzero effect conditions will be used to estimate statistical power.
+
+Across all `r nrow(condition_grid)` conditions, the intercept, remaining regression coefficients, predictor distributions, and residual variance will remain fixed as specified in Core Task 2. This design isolates the effects of sample size and the magnitude of the target coefficient on regression performance.
+
+### Core: Task 4
+
+***Evaluation criteria.** Power and the false-positive rate are non-negotiable outcome criteria each with a stated target (“80% power,” “FPR within Monte Carlo error of α”). Then choose whether any criterion from the Week 9 set beyond those, including bias, coverage, SE ratio (analytical vs. empirical) will also be featured. Lay out a rationale for why or why not; a power study that also checks whether the standard errors can be trusted is a stronger study, for instance.*
+
+The simulation study will evaluate regression performance using statistical power, the false-positive rate, confidence interval coverage, and standard-error accuracy. Each criterion will be calculated across simulation replications for the coefficient of interest, $\beta_1$, using two-sided hypothesis tests with a nominal significance level of $\alpha = 0.05$.
+
+Statistical power will be calculated as the proportion of replications in which the null hypothesis ($H_0: \beta_1 = 0$) is rejected when the true coefficient is 0.1 or 0.3. The target will be at least 80% power, allowing the study to identify sample sizes that provide an adequate probability of detecting small and medium effects.
+
+The false-positive rate (FPR) will be calculated as the proportion of replications yielding a statistically significant result when the true coefficient is zero. The target will be the nominal significance level of 0.05, allowing for Monte Carlo sampling error.
+
+Confidence interval coverage will be calculated as the proportion of 95% confidence intervals containing the true value of $\beta_1$. Coverage will be evaluated against the nominal 95% level, allowing for Monte Carlo error. This criterion provides additional information about whether the regression procedure appropriately represents uncertainty across repeated samples.
+
+Standard-error accuracy will be evaluated by comparing the mean analytical standard error reported by the regression model with the empirical standard error, defined as the standard deviation of the estimated coefficients across replications. Their ratio will be calculated as the mean analytical standard error divided by the empirical standard error, with values near 1 indicating agreement between model-based and observed sampling variability.
+
+Power and the false-positive rate are the primary evaluation criteria because they directly address the study's purpose. Confidence interval coverage and standard-error accuracy are included as secondary criteria, building on IC-09 to examine whether the model's inferential uncertainty is appropriately calibrated. Although bias and relative bias were also introduced in IC-09, they will not be featured as primary evaluation criteria because the present study focuses on hypothesis testing and uncertainty estimation rather than coefficient recovery.
+
+### Core: Task 5
+
+***Replication count.** Justified through Monte Carlo error, not based on convention. For example, the Monte Carlo SE of a coverage estimate is* $\sqrt{p(1-p)/R}$*; the calculation we used in IC-09. Show the arithmetic that connects your chosen R to the precision your targets require. Remember to round to an integer value.*
+
+```{r}
+
+# Target Monte Carlo standard error
+target_mcse <- 0.01
+
+# Anticipated probabilities
+probabilities <- c(
+  Power = 0.80,
+  FPR = 0.05,
+  Coverage = 0.95,
+  Conservative = 0.50
+)
+
+# Calculate required replications
+replication_summary <- data.frame(
+  Criterion = names(probabilities),
+  Probability = as.numeric(probabilities),
+  Required_R = ceiling(
+    probabilities * (1 - probabilities) / target_mcse^2
+  )
+)
+
+print(replication_summary, row.names = FALSE)
+
+# Select replication count and calculate total fits
+n_replications <- max(replication_summary$Required_R)
+total_fits <- nrow(condition_grid) * n_replications
+
+cat("Replications per condition:", n_replications, "\n")
+cat("Total regression fits:", total_fits, "\n")
+
+```
+
+The number of simulation replications will be determined using Monte Carlo standard error (MCSE), rather than selecting a replication count based on convention. Because statistical power, the false-positive rate, and confidence interval coverage are estimated as proportions, their Monte Carlo precision can be evaluated using:
+
+$$MCSE(\hat{p}) = \sqrt{\frac{p(1-p)}{R}}$$
+
+where $p$ is the anticipated probability and $R$ is the number of independent simulation replications. Rearranging this equation gives:
+
+$$R = \frac{p(1-p)}{MCSE^2}$$
+
+The study will target an MCSE of no more than `r target_mcse`, corresponding to `r target_mcse * 100` percentage point. At the target power of 0.80, this requires $R = 0.80(0.20)/0.01^2 =$ `r replication_summary$Required_R[replication_summary$Criterion == "Power"]` replications. For the nominal false-positive rate of 0.05 and confidence interval coverage of 0.95, the corresponding requirement is $R = 0.05(0.95)/0.01^2 =$ `r replication_summary$Required_R[replication_summary$Criterion == "FPR"]` replications for each criterion.
+
+Because statistical power may differ from the anticipated target across conditions, the replication count will be based on the conservative case of $p = 0.50$, which maximizes the variance of a Bernoulli outcome. Under this condition, $R = 0.50(0.50)/0.01^2 =$ `r replication_summary$Required_R[replication_summary$Criterion == "Conservative"]` replications are required. Accordingly, the full simulation study will use `r format(n_replications, big.mark = ",")` replications per condition, yielding `r format(total_fits, big.mark = ",")` simulated datasets across the `r nrow(condition_grid)` conditions specified in Core Task 3. This replication count limits the theoretical MCSE of each estimated proportion to `r target_mcse`, assuming independent replications, and provides a consistent level of precision across conditions.
+
+The prototype and pilot simulations will use fewer replications to verify the implementation and evaluate computational feasibility before conducting the full study.
+
+### Core: Task 6
+
+***Prototype.** Exactly one cell of your condition grid, run end-to-end in the rendered document: modest replications, seed set, producing the evaluation table you planned in (4) for that cell. This is your proof that your A4 functions, your DGP, and your evaluation code actually work. It does not need to be fast yet; we will expand on that in Week 11.*
+
+```{r}
+
+# Load the regression function developed in Assignment 04
+source("R/regression_functions.R")
+
+# Set seed for reproducibility
+set.seed(202611030)
+
+# Prototype condition
+n_prototype <- 200
+beta1_prototype <- 0.3
+R_prototype <- 200
+alpha <- 0.05
+
+# Fixed population parameters
+beta0 <- 2
+beta2 <- 0.4
+beta3 <- -0.3
+sigma <- 1
+
+# Store results from each replication
+prototype_results <- data.frame(
+  beta1_hat = numeric(R_prototype),
+  analytical_se = numeric(R_prototype),
+  p_value = numeric(R_prototype),
+  ci_lower = numeric(R_prototype),
+  ci_upper = numeric(R_prototype)
+)
+
+# Run the prototype simulation
+for (r in seq_len(R_prototype)) {
+  
+  # Generate independent predictors
+  X <- cbind(
+    x1 = rnorm(n_prototype),
+    x2 = rnorm(n_prototype),
+    x3 = rnorm(n_prototype)
+  )
+  
+  # Generate outcome using the specified DGP
+  y <- beta0 +
+    beta1_prototype * X[, "x1"] +
+    beta2 * X[, "x2"] +
+    beta3 * X[, "x3"] +
+    rnorm(n_prototype, mean = 0, sd = sigma)
+  
+  # Fit the Assignment 04 matrix regression
+  model <- fit_matrix_reg(y, X)
+  
+  # Extract coefficient and standard error for x1
+  beta_hat <- as.numeric(model$coefficients[2, 1])
+  se_hat <- as.numeric(model$standard_errors[2])
+  
+  # Calculate 95% confidence interval
+  df <- n_prototype - nrow(model$coefficients)
+  t_critical <- qt(1 - alpha / 2, df = df)
+  
+  # Store replication results
+  prototype_results$beta1_hat[r] <- beta_hat
+  prototype_results$analytical_se[r] <- se_hat
+  prototype_results$p_value[r] <- model$p_values[2]
+  prototype_results$ci_lower[r] <- beta_hat - t_critical * se_hat
+  prototype_results$ci_upper[r] <- beta_hat + t_critical * se_hat
+}
+
+# Statistical power
+power <- mean(prototype_results$p_value < alpha)
+
+# Confidence interval coverage
+coverage <- mean(
+  prototype_results$ci_lower <= beta1_prototype &
+    prototype_results$ci_upper >= beta1_prototype
+)
+
+# Analytical and empirical standard errors
+mean_analytical_se <- mean(prototype_results$analytical_se)
+empirical_se <- sd(prototype_results$beta1_hat)
+
+# Standard-error ratio
+se_ratio <- mean_analytical_se / empirical_se
+
+# Compile evaluation table
+prototype_evaluation <- data.frame(
+  Sample_Size = n_prototype,
+  True_Beta1 = beta1_prototype,
+  Replications = R_prototype,
+  Power = power,
+  FPR = NA_real_,
+  Coverage = coverage,
+  Mean_Analytical_SE = mean_analytical_se,
+  Empirical_SE = empirical_se,
+  SE_Ratio = se_ratio
+)
+
+print(prototype_evaluation, row.names = FALSE)
+
+```
+
+The prototype simulation evaluated one condition from the proposed simulation grid, with a sample size of `r n_prototype`, a true coefficient of `r beta1_prototype`, and `r R_prototype` replications. Estimated statistical power was `r round(power, 3)`, exceeding the target of 0.80. The 95% confidence interval coverage was `r round(coverage, 3)`, slightly below the nominal coverage of 0.95 but within the expected Monte Carlo sampling variability for 200 replications. The mean analytical standard error was `r round(mean_analytical_se, 3)`, compared with an empirical standard error of `r round(empirical_se, 3)`, yielding an SE ratio of `r round(se_ratio, 3)`. Although the ratio suggests that analytical standard errors were slightly smaller than the observed sampling variability, this difference does not necessarily indicate systematic miscalibration given the modest replication count. The false-positive rate was not evaluated because the true coefficient was nonzero.
+
+Overall, the prototype demonstrates that the data-generating model, matrix-based regression function, and evaluation procedures can be executed together to produce the planned evaluation metrics. These findings support proceeding to the pilot simulation, where additional conditions will be examined before implementing the full study with 2,500 replications per condition.
+
+### Stretch: Task 1
+
+*At least two conditions from your grid run at modest replications.*
+
+```{r}
+
+
+# Set seed for reproducibility
+set.seed(202611031)
+
+# Select two conditions from the simulation grid
+pilot_conditions <- data.frame(
+  n = c(200, 200),
+  beta1 = c(0, 0.3)
+)
+
+# Use a modest number of replications
+R_pilot <- 200
+
+# Create storage for pilot evaluation results
+pilot_evaluation <- data.frame()
+
+# Run both pilot conditions
+for (condition in seq_len(nrow(pilot_conditions))) {
+  
+  n_current <- pilot_conditions$n[condition]
+  beta1_current <- pilot_conditions$beta1[condition]
+  
+  # Store results across replications
+  pilot_results <- data.frame(
+    beta1_hat = numeric(R_pilot),
+    analytical_se = numeric(R_pilot),
+    p_value = numeric(R_pilot),
+    ci_lower = numeric(R_pilot),
+    ci_upper = numeric(R_pilot)
+  )
+  
+  for (r in seq_len(R_pilot)) {
+    
+    # Generate predictors
+    X <- cbind(
+      x1 = rnorm(n_current),
+      x2 = rnorm(n_current),
+      x3 = rnorm(n_current)
+    )
+    
+    # Generate outcome
+    y <- beta0 +
+      beta1_current * X[, "x1"] +
+      beta2 * X[, "x2"] +
+      beta3 * X[, "x3"] +
+      rnorm(n_current, mean = 0, sd = sigma)
+    
+    # Fit matrix regression
+    model <- fit_matrix_reg(y, X)
+    
+    # Extract coefficient and standard error
+    beta_hat <- as.numeric(model$coefficients[2, 1])
+    se_hat <- as.numeric(model$standard_errors[2])
+    
+    # Construct 95% confidence interval
+    df <- n_current - nrow(model$coefficients)
+    t_critical <- qt(1 - alpha / 2, df = df)
+    
+    # Store results
+    pilot_results$beta1_hat[r] <- beta_hat
+    pilot_results$analytical_se[r] <- se_hat
+    pilot_results$p_value[r] <- model$p_values[2]
+    pilot_results$ci_lower[r] <- beta_hat - t_critical * se_hat
+    pilot_results$ci_upper[r] <- beta_hat + t_critical * se_hat
+  }
+  
+  # Calculate evaluation metrics
+  rejection_rate <- mean(pilot_results$p_value < alpha)
+  
+  coverage <- mean(
+    pilot_results$ci_lower <= beta1_current &
+      pilot_results$ci_upper >= beta1_current
+  )
+  
+  mean_analytical_se <- mean(pilot_results$analytical_se)
+  empirical_se <- sd(pilot_results$beta1_hat)
+  se_ratio <- mean_analytical_se / empirical_se
+  
+  # Append one row for this condition
+  pilot_evaluation <- rbind(
+    pilot_evaluation,
+    data.frame(
+      Sample_Size = n_current,
+      True_Beta1 = beta1_current,
+      Replications = R_pilot,
+      Power = if (beta1_current != 0) rejection_rate else NA_real_,
+      FPR = if (beta1_current == 0) rejection_rate else NA_real_,
+      Coverage = coverage,
+      Mean_Analytical_SE = mean_analytical_se,
+      Empirical_SE = empirical_se,
+      SE_Ratio = se_ratio
+    )
+  )
+}
+
+```
+
+The pilot simulation will evaluate two conditions from the proposed condition grid, holding sample size constant at 200 while varying the true coefficient of interest between 0 (null effect) and 0.3 (medium effect). Each condition will be evaluated using 200 replications. This comparison allows the false-positive rate to be assessed under the null condition and statistical power to be assessed under the medium-effect condition, while also examining confidence interval coverage and standard-error accuracy in both conditions. The pilot will provide preliminary evidence about the implementation and adequacy of the proposed simulation design before proceeding to the full study.
+
+### Stretch: Task 2
+
+*A preliminary evaluation table comparing them.*
+
+```{r}
+
+# Display preliminary evaluation results
+print(pilot_evaluation, row.names = FALSE)
+
+```
+
+The preliminary evaluation results indicate that the regression procedure performed reasonably well under both pilot conditions. The estimated false-positive rate matched the nominal significance level of 0.05 under the null condition, while statistical power exceeded the 0.80 target under the medium-effect condition. Confidence interval coverage was close to the nominal 0.95 level, and the standard-error ratios suggested reasonable agreement between analytical and empirical standard errors. These findings provide an initial assessment of regression performance across the two pilot conditions, although the estimates remain subject to Monte Carlo uncertainty given the modest replication count.
+
+### Stretch: Task 3
+
+*One documented design revision: something in your plan — a parameter value, a condition level, an evaluation criterion, the replication budget — that the pilot results caused you to change, stated as before → after, with the pilot evidence that prompted the change.*
+
+The pilot results did not provide sufficient evidence to justify revising the proposed simulation design. Under the null-effect condition, the estimated false-positive rate was `r round(pilot_evaluation$FPR[1], 3)`, matching the nominal significance level of 0.05. Confidence interval coverage was `r round(pilot_evaluation$Coverage[1], 3)` and `r round(pilot_evaluation$Coverage[2], 3)` across the null and medium-effect conditions, respectively. With 200 replications, the Monte Carlo standard error for 95% coverage is approximately `r round(sqrt(0.95 * 0.05 / R_pilot), 4)`, indicating that both observed coverage estimates fall within approximately two Monte Carlo standard errors of the nominal 0.95 target. The standard-error ratios of `r round(pilot_evaluation$SE_Ratio[1], 3)` and `r round(pilot_evaluation$SE_Ratio[2], 3)` also indicated reasonable agreement between analytical and empirical standard errors, providing no clear evidence of substantial miscalibration.
+
+These findings support retaining the data-generating model and evaluation criteria because the regression procedure exhibited the expected inferential behavior under the two pilot conditions. The original condition grid will also be retained, as the pilot does not provide evidence that any of its levels are inappropriate; importantly, the small-effect condition and other sample sizes remain untested. Similarly, the planned `r format(n_replications, big.mark = ",")` replications per condition will be retained because the pilot's modest replication count produces greater Monte Carlo uncertainty than the precision target established in Core Task 5. The full simulation will therefore proceed with `r nrow(condition_grid)` conditions and `r format(n_replications, big.mark = ",")` replications per condition, allowing the study to evaluate statistical power and uncertainty estimation with greater precision across the proposed design.
